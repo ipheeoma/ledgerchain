@@ -1,52 +1,96 @@
-# Ledgerchain smart contract
+# LedgerChain Smart Contract
 
-Ledgerchain is a decentralized proof-of-ownership registry for NFTs, real estate, or physical assets built on the Stacks blockchain using Clarity smart contracts.
+LedgerChain is a decentralized proof-of-ownership registry for properties built on the Stacks blockchain using Clarity smart contracts.
 
 ## Description
 
-Ledgerchain allows users to register their assets by minting unique NFTs as proof of ownership. The system facilitates secure transfer or sale of assets through signature verification from both parties. It also includes optional integration with Bitcoin for payments or collateralization.
+LedgerChain enables users to register properties by minting unique NFTs as proof of ownership. The smart contract provides comprehensive functionality for property management, including:
+
+- Property registration
+- Ownership transfer with cryptographic signature verification
+- Property details storage and retrieval
+- Property valuation updates
+- Geographic and zoning information management
+- Cryptocurrency-based property purchase
 
 ## Smart Contract Features
 
-- Asset registration (minting NFTs)
-- Asset ownership transfer with signature verification
-- Asset details storage and retrieval
-- Asset price updates
-- Asset purchase using Bitcoin (placeholder implementation)
+- Non-fungible token (NFT) representation of property ownership
+- Secure property registration with validation checks
+- Property ownership transfer with digital signature authentication
+- Property details tracking, including:
+  - Current owner
+  - Property information
+  - Valuation
+  - Geographic data
+  - Zoning information
+- Ability to update property details (valuation, geographic data, zoning info)
+- Placeholder cryptocurrency payment integration
 
-## Usage
+## Function Overview
 
-### Interacting with the Contract
+### `register-property`
+Registers a new property as an NFT with the following parameters:
+- `property-info`: Descriptive information about the property
+- `valuation`: Property's monetary value
+- `geographic-data`: Location and geographic details
+- `zoning-info`: Zoning classification
 
-You can interact with the contract using the Stacks API or a frontend application. Here are some example function calls:
+### `transfer-property`
+Transfers property ownership with:
+- Signature verification
+- Ownership transfer restrictions
+- Digital signature validation
 
-1. Register an asset:
-   ```
-   (contract-call? .ledgerchain register-asset "Mona Lisa Painting" u1000000)
-   ```
+### `update-property-valuation`
+Allows property owner to update the property's valuation
 
-2. Transfer an asset:
-   ```
-   (contract-call? .ledgerchain transfer-asset u1 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM (signature))
-   ```
+### `update-geographic-data`
+Enables owner to update the property's geographic information
 
-3. Get asset details:
-   ```
-   (contract-call? .ledgerchain get-asset-details u1)
-   ```
+### `update-zoning-info`
+Permits owner to modify the property's zoning classification
 
-4. Update asset price:
-   ```
-   (contract-call? .ledgerchain update-asset-price u1 u1100000)
-   ```
+### `purchase-property`
+Facilitates property purchase using cryptocurrency (currently a placeholder implementation)
 
-5. Buy an asset using Bitcoin:
-   ```
-   (contract-call? .ledgerchain buy-asset u1 0x...)
-   ```
+## Usage Examples
+
+### Register a Property
+```clarity
+(contract-call? .ledgerchain register-property 
+  "123 Main St, Anytown, USA" 
+  u500000 
+  "Coordinates: 40.7128° N, 74.0060° W" 
+  "Residential")
+```
+
+### Transfer Property
+```clarity
+(contract-call? .ledgerchain transfer-property 
+  u1 
+  'ST2CY5V39MWFZXM5BN5CXYJ4GQTFZGBWQD9DRHK 
+  (signature))
+```
+
+### Update Property Valuation
+```clarity
+(contract-call? .ledgerchain update-property-valuation 
+  u1 
+  u550000)
+```
 
 ## Security Considerations
 
-- The current implementation uses a simplified signature verification process. In a production environment, a more robust verification system should be implemented.
-- The Bitcoin integration is currently a placeholder. A proper integration would require additional off-chain components and potentially the use of oracles.
-- Always audit smart contracts thoroughly before deploying to mainnet.
+- Implements signature verification for ownership transfers
+- Includes validation checks for property registration
+- Restricts property updates to current owner
+- Placeholder cryptocurrency payment validation
+
+## Limitations and Recommendations
+
+- Signature verification is a simplified implementation
+- Cryptocurrency payment integration is currently a placeholder
+- Recommended to conduct thorough smart contract audits before mainnet deployment
+- Additional off-chain components may be necessary for full functionality
+
