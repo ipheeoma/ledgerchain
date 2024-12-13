@@ -6,14 +6,21 @@
   {
     current-owner: principal,
     property-info: (string-ascii 256),
-    valuation: uint
+    valuation: uint,
+    geographic-data: (string-ascii 256),
+    zoning-info: (string-ascii 100)
   }
 )
 
 (define-data-var property-id-counter uint u0)
 
 ;; Function to register a new property
-(define-public (register-property (property-info (string-ascii 256)) (valuation uint))
+(define-public (register-property 
+  (property-info (string-ascii 256)) 
+  (valuation uint)
+  (geographic-data (string-ascii 256))
+  (zoning-info (string-ascii 100))
+)
   (let
     (
       (new-property-id (+ (var-get property-id-counter) u1))
@@ -22,12 +29,18 @@
     (asserts! (> valuation u0) (err u400))
     ;; Check if property-info is not empty
     (asserts! (> (len property-info) u0) (err u401))
+    ;; Check if geographic-data is not empty
+    (asserts! (> (len geographic-data) u0) (err u407))
+    ;; Check if zoning-info is not empty
+    (asserts! (> (len zoning-info) u0) (err u408))
     (try! (nft-mint? property new-property-id tx-sender))
     (map-set property-registry new-property-id
       {
         current-owner: tx-sender,
         property-info: property-info,
-        valuation: valuation
+        valuation: valuation,
+        geographic-data: geographic-data,
+        zoning-info: zoning-info
       }
     )
     (var-set property-id-counter new-property-id)
@@ -102,6 +115,36 @@
     (asserts! (is-eq tx-sender (get current-owner property-data)) (err u403))
     (map-set property-registry property-id
       (merge property-data { valuation: new-valuation })
+    )
+    (ok true)
+  )
+)
+
+;; Function to update geographic data
+(define-public (update-geographic-data (property-id uint) (new-geographic-data (string-ascii 256)))
+  (let
+    (
+      (property-data (unwrap! (map-get? property-registry property-id) (err u404)))
+    )
+    (asserts! (is-eq tx-sender (get current-owner property-data)) (err u403))
+    (asserts! (> (len new-geographic-data) u0) (err u407))
+    (map-set property-registry property-id
+      (merge property-data { geographic-data: new-geographic-data })
+    )
+    (ok true)
+  )
+)
+
+;; Function to update zoning information
+(define-public (update-zoning-info (property-id uint) (new-zoning-info (string-ascii 100)))
+  (let
+    (
+      (property-data (unwrap! (map-get? property-registry property-id) (err u404)))
+    )
+    (asserts! (is-eq tx-sender (get current-owner property-data)) (err u403))
+    (asserts! (> (len new-zoning-info) u0) (err u408))
+    (map-set property-registry property-id
+      (merge property-data { zoning-info: new-zoning-info })
     )
     (ok true)
   )
