@@ -1,105 +1,143 @@
-;; Ledgerchain smart contract: A decentralized proof-of-ownership registry
+;; LedgerChain smart contract: A decentralized proof-of-ownership registry
 
-;; Define the asset NFT
-(define-non-fungible-token asset uint)
+(define-non-fungible-token property uint)
 
-;; Data map to store asset details
-(define-map asset-details uint 
+(define-map property-registry uint 
   {
-    owner: principal,
-    description: (string-ascii 256),
-    price: uint
+    current-owner: principal,
+    property-info: (string-ascii 256),
+    valuation: uint
   }
 )
 
-;; Counter for asset IDs
-(define-data-var asset-id-counter uint u0)
+(define-data-var property-id-counter uint u0)
 
-;; Function to register a new asset
-(define-public (register-asset (description (string-ascii 256)) (price uint))
+;; Function to register a new property
+(define-public (register-property (property-info (string-ascii 256)) (valuation uint))
   (let
     (
-      (new-asset-id (+ (var-get asset-id-counter) u1))
+      (new-property-id (+ (var-get property-id-counter) u1))
     )
-    (try! (nft-mint? asset new-asset-id tx-sender))
-    (map-set asset-details new-asset-id
+    ;; Check if valuation is greater than zero
+    (asserts! (> valuation u0) (err u400))
+    ;; Check if property-info is not empty
+    (asserts! (> (len property-info) u0) (err u401))
+    (try! (nft-mint? property new-property-id tx-sender))
+    (map-set property-registry new-property-id
       {
-        owner: tx-sender,
-        description: description,
-        price: price
+        current-owner: tx-sender,
+        property-info: property-info,
+        valuation: valuation
       }
     )
-    (var-set asset-id-counter new-asset-id)
-    (ok new-asset-id)
+    (var-set property-id-counter new-property-id)
+    (ok new-property-id)
   )
 )
 
-;; Function to transfer asset ownership
-(define-public (transfer-asset (asset-id uint) (recipient principal) (signature (buff 65)))
+;; Function to transfer property ownership
+(define-public (transfer-property (property-id uint) (new-owner principal) (digital-signature (buff 65)))
   (let
     (
-      (asset-info (unwrap! (map-get? asset-details asset-id) (err u404)))
-      (sender (unwrap! (nft-get-owner? asset asset-id) (err u404)))
+      (property-data (unwrap! (map-get? property-registry property-id) (err u404)))
+      (current-owner (unwrap! (nft-get-owner? property property-id) (err u404)))
     )
-    (asserts! (is-eq tx-sender sender) (err u403))
-    (asserts! (is-valid-signature? asset-id recipient signature) (err u401))
-    (try! (nft-transfer? asset asset-id sender recipient))
-    (map-set asset-details asset-id
-      (merge asset-info { owner: recipient })
+    (asserts! (is-eq tx-sender current-owner) (err u403))
+    ;; Check if new-owner is not the current owner
+    (asserts! (not (is-eq new-owner current-owner)) (err u405))
+    ;; Check if digital-signature is not empty
+    (asserts! (> (len digital-signature) u0) (err u406))
+    (try! (validate-signature property-id current-owner new-owner digital-signature))
+    (try! (nft-transfer? property property-id current-owner new-owner))
+    (map-set property-registry property-id
+      (merge property-data { current-owner: new-owner })
     )
     (ok true)
   )
 )
 
-;; Function to verify signature
-(define-private (is-valid-signature? (asset-id uint) (recipient principal) (signature (buff 65)))
-  (let
+;; Function to validate signature
+(define-private (validate-signature (property-id uint) (current-owner principal) (new-owner principal) (digital-signature (buff 65)))
+  (let 
     (
-      (message (concat (to-uint asset-id) (principal-to-uint256 recipient)))
+      ;; Create message hash from property ID and new owner
+      (message-hash 
+        (sha256 
+          (concat 
+            (uint-to-buff property-id) 
+            (principal-to-buff new-owner)
+          )
+        )
+      )
+      ;; Attempt to recover the public key
+      (recovered-result (secp256k1-recover? message-hash digital-signature))
     )
-    (is-eq (secp256k1-recover? message signature) (some (unwrap! (nft-get-owner? asset asset-id) false)))
+    (match recovered-result 
+      recovered-pubkey 
+        (let
+          (
+            (recovered-principal (unwrap! (principal-of? recovered-pubkey) (err u401)))
+          )
+          (if (is-eq recovered-principal current-owner)
+              (ok true)
+              (err u401))
+        )
+      error-value
+        (err u402)
+    )
   )
 )
 
-;; Function to get asset details
-(define-read-only (get-asset-details (asset-id uint))
-  (map-get? asset-details asset-id)
+;; Function to get property details
+(define-read-only (get-property-details (property-id uint))
+  (map-get? property-registry property-id)
 )
 
-;; Function to update asset price
-(define-public (update-asset-price (asset-id uint) (new-price uint))
+;; Function to update property valuation
+(define-public (update-property-valuation (property-id uint) (new-valuation uint))
   (let
     (
-      (asset-info (unwrap! (map-get? asset-details asset-id) (err u404)))
+      (property-data (unwrap! (map-get? property-registry property-id) (err u404)))
     )
-    (asserts! (is-eq tx-sender (get owner asset-info)) (err u403))
-    (map-set asset-details asset-id
-      (merge asset-info { price: new-price })
+    (asserts! (is-eq tx-sender (get current-owner property-data)) (err u403))
+    (map-set property-registry property-id
+      (merge property-data { valuation: new-valuation })
     )
     (ok true)
   )
 )
 
-;; Function to buy asset using Bitcoin
-(define-public (buy-asset (asset-id uint) (btc-tx (buff 1024)))
+;; Function to purchase property using cryptocurrency
+(define-public (purchase-property (property-id uint) (crypto-tx-hash (buff 32)))
   (let
     (
-      (asset-info (unwrap! (map-get? asset-details asset-id) (err u404)))
-      (seller (unwrap! (nft-get-owner? asset asset-id) (err u404)))
-      (price (get price asset-info))
+      (property-data (unwrap! (map-get? property-registry property-id) (err u404)))
+      (seller (unwrap! (nft-get-owner? property property-id) (err u404)))
+      (price (get valuation property-data))
     )
-    (asserts! (is-valid-btc-payment? btc-tx price seller) (err u402))
-    (try! (nft-transfer? asset asset-id seller tx-sender))
-    (map-set asset-details asset-id
-      (merge asset-info { owner: tx-sender })
+    (asserts! (is-valid-crypto-payment? crypto-tx-hash price seller) (err u402))
+    (try! (nft-transfer? property property-id seller tx-sender))
+    (map-set property-registry property-id
+      (merge property-data { current-owner: tx-sender })
     )
     (ok true)
   )
 )
 
-;; Helper function to validate Bitcoin payment (placeholder)
-(define-private (is-valid-btc-payment? (btc-tx (buff 1024)) (expected-amount uint) (recipient principal))
-  ;; In a real implementation, this function would verify the Bitcoin transaction
+;; Helper function to validate cryptocurrency payment (placeholder)
+(define-private (is-valid-crypto-payment? (crypto-tx-hash (buff 32)) (expected-amount uint) (recipient principal))
+  ;; In a real implementation, this function would verify the cryptocurrency transaction
   ;; For this example, we'll just return true
   true
 )
+
+;; Helper function to convert principal to buff
+(define-private (principal-to-buff (value principal))
+  (unwrap-panic (to-consensus-buff? value))
+)
+
+;; Helper function to convert uint to buff
+(define-private (uint-to-buff (value uint))
+  (unwrap-panic (to-consensus-buff? value))
+)
+
