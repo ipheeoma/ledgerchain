@@ -1,4 +1,4 @@
-;; Ledgerchain: A decentralized proof-of-ownership registry
+;; Ledgerchain smart contract: A decentralized proof-of-ownership registry
 
 ;; Define the asset NFT
 (define-non-fungible-token asset uint)
